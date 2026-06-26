@@ -30,6 +30,8 @@ def scheduled_rates_sync():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(timezone='UTC')
+    # Run immediately in the background on startup
+    scheduler.add_job(scheduled_rates_sync)
     # Run at 00:00 on the 26th of every month
     scheduler.add_job(scheduled_rates_sync, 'cron', day=26, hour=0, minute=0)
     scheduler.start()
