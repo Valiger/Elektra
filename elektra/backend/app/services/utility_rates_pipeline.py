@@ -3,6 +3,7 @@ import logging
 import httpx
 from typing import Dict, Optional
 from datetime import datetime, timezone
+import re
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.du_rate import DURate
@@ -213,12 +214,26 @@ def sync_utility_rates(db: Session):
     return updated_records
 
 
+def _normalize(name: str) -> str:
+    n = name.strip().lower()
+    aliases = {"more power": "more electric"}
+    if n in aliases: n = aliases[n]
+    n = re.sub(r'\s*1$', ' i', n)
+    n = re.sub(r'\s*2$', ' ii', n)
+    n = re.sub(r'\s*3$', ' iii', n)
+    n = re.sub(r'\s*4$', ' iv', n)
+    return n.replace(" ", "")
+
 def _upsert_rate(db: Session, du_name: str, rate: float, region: str, consumer_class: str, now: datetime):
-    row = db.query(DURate).filter(
-        func.lower(DURate.du_name) == du_name.lower(),
-        DURate.consumer_class == consumer_class
-    ).first()
+    all_rates = db.query(DURate).filter(DURate.consumer_class == consumer_class).all()
+    target_norm = _normalize(du_name)
     
+    row = None
+    for r in all_rates:
+        if _normalize(r.du_name) == target_norm:
+            row = r
+            break
+            
     if row:
         row.rate_per_kwh = rate
         row.region = region
