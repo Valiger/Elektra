@@ -1,0 +1,107 @@
+# ============================================================
+# Elektra – Root .gitignore
+# ============================================================
+
+# ---- Secrets & Credentials ---------------------------------
+.env
+.env.*
+!.env.example
+*.json.key
+*service-account*.json
+*credentials*.json
+elektra-vision-*.json          # Google Cloud service-account key
+
+# ---- Python -------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ---- Virtual Environments -----------------------------------
+venv/
+env/
+ENV/
+.venv/
+
+# ---- SQLite databases (never commit the live DB) ------------
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- Upload artefacts ---------------------------------------
+elektra/backend/uploads/
+
+# ---- Node / React / Expo ------------------------------------
+node_modules/
+dist/
+dist-ssr/
+web-build/
+.expo/
+expo-env.d.ts
+.expo-shared/
+
+# ---- Logs ---------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Build outputs ------------------------------------------
+*.local
+*.tsbuildinfo
+
+# ---- OS artefacts -------------------------------------------
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---- IDE ---------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# ---- Mobile signing keys (NEVER commit) --------------------
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# ---- Debug files left by development -----------------------
+ocr_debug.txt
+ocr_debug_error.txt
+
+# ---- Misc ---------------------------------------------------
+.mypy_cache/
+stitch_design/
