@@ -22,3 +22,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Fix for Railway/Heroku Postgres URLs: SQLAlchemy 1.4+ requires postgresql+psycopg2://
+if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgresql://"):
+    settings.DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
