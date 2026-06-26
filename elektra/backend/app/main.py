@@ -29,7 +29,7 @@ def scheduled_rates_sync():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone='UTC')
     # Run at 00:00 on the 26th of every month
     scheduler.add_job(scheduled_rates_sync, 'cron', day=26, hour=0, minute=0)
     scheduler.start()
@@ -39,7 +39,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Elektra Backend API",
-    description=(
     description=(
         "Backend for the Elektra Philippine electric bill "
         "scanner and AI energy tips app."
