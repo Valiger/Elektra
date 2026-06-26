@@ -176,6 +176,16 @@ def sync_utility_rates(db: Session):
             _upsert_rate(db, du_name, final_rate, region, consumer_class, now)
             updated_records.append({"du_name": du_name, "class": consumer_class, "rate": final_rate})
 
+    # Apply Fallback for Presyo if missing in primary source (Google Sheets)
+    residential_gsheet = gsheet_rates.get("Residential", {})
+    for du_name, rate in presyo_rates.items():
+        if du_name not in residential_gsheet:
+            logger.info(f"Using Presyo fallback rate for {du_name} (Residential): {rate}")
+            # Region is unknown from Presyo currently, default to empty
+            _upsert_rate(db, du_name, rate, "", "Residential", now)
+            updated_records.append({"du_name": du_name, "class": "Residential", "rate": rate})
+
+
     # Apply Fallback for ALECO if missing in primary source
     # ALECO labels map to our classes
     aleco_class_map = {

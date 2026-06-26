@@ -1,6 +1,7 @@
 import os
 import logging
 from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,14 +12,40 @@ from slowapi.errors import RateLimitExceeded
 from app.routes import auth, cooperatives, rates, receipts
 from app.config import settings
 from app.limiter import limiter
+from app.db.database import SessionLocal
+from app.services.utility_rates_pipeline import sync_utility_rates
+from apscheduler.schedulers.background import BackgroundScheduler
+
+def scheduled_rates_sync():
+    logger = logging.getLogger(__name__)
+    logger.info("Running scheduled utility rates sync...")
+    db = SessionLocal()
+    try:
+        sync_utility_rates(db)
+    except Exception as e:
+        logger.error(f"Scheduled sync failed: {e}")
+    finally:
+        db.close()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = BackgroundScheduler()
+    # Run at 00:00 on the 26th of every month
+    scheduler.add_job(scheduled_rates_sync, 'cron', day=26, hour=0, minute=0)
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
 
 app = FastAPI(
     title="Elektra Backend API",
+    description=(
     description=(
         "Backend for the Elektra Philippine electric bill "
         "scanner and AI energy tips app."
     ),
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
