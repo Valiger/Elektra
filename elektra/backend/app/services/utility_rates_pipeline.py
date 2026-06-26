@@ -3,6 +3,7 @@ import logging
 import httpx
 from typing import Dict, Optional
 from datetime import datetime, timezone
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.du_rate import DURate
 from app.services.scraper_service import scrape_aleco_rates
@@ -214,7 +215,7 @@ def sync_utility_rates(db: Session):
 
 def _upsert_rate(db: Session, du_name: str, rate: float, region: str, consumer_class: str, now: datetime):
     row = db.query(DURate).filter(
-        DURate.du_name == du_name,
+        func.lower(DURate.du_name) == du_name.lower(),
         DURate.consumer_class == consumer_class
     ).first()
     
