@@ -10,7 +10,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full glass-panel rounded-t-3xl z-50 shadow-[0_-8px_32px_rgba(100,60,180,0.20)] pb-safe-area-inset-bottom">
+    <nav className="fixed bottom-0 left-0 w-full z-50 rounded-t-3xl shadow-[0_-8px_32px_rgba(60,20,120,0.50)]" style={{ background: 'rgba(22, 8, 50, 0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderTop: '1px solid rgba(180,150,230,0.15)' }}>
       <div className="flex justify-around items-center px-4 py-4 sm:px-8 max-w-[500px] mx-auto">
         {navItems.map((item) => (
           <NavLink
