@@ -50,27 +50,43 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 MAX_SIZE = 10 * 1024 * 1024  # 10 MB
 
 MONTHS_MAP = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+    "january": 1, "february": 2, "march": 3,
+    "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9,
+    "october": 10, "november": 11, "december": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4,
+    "jun": 6, "jul": 7, "aug": 8, "sep": 9,
+    "oct": 10, "nov": 11, "dec": 12,
 }
 
-def sort_bills_chronologically(bills: list[Bill], reverse: bool = False) -> list[Bill]:
+
+def sort_bills_chronologically(
+    bills: list[Bill], reverse: bool = False
+) -> list[Bill]:
     def get_sort_key(b: Bill):
         if not b.billing_period:
-            return (0, 0, b.scanned_at.timestamp() if b.scanned_at else 0)
-            
+            return (
+                0, 0,
+                b.scanned_at.timestamp() if b.scanned_at else 0,
+            )
+
         bp = b.billing_period.strip()
-        
+
         # Try to find dates in MM/DD/YYYY or MM-DD-YYYY format
         # and take the last date found (the end of the billing period)
-        date_matches = re.findall(r'(0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\d|3[01])[-/](\d{4})', bp)
+        date_matches = re.findall(
+            r'(0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\d|3[01])[-/](\d{4})',
+            bp,
+        )
         if date_matches:
             last_match = date_matches[-1]
             month = int(last_match[0])
             year = int(last_match[1])
-            return (year, month, b.scanned_at.timestamp() if b.scanned_at else 0)
-            
+            return (
+                year, month,
+                b.scanned_at.timestamp() if b.scanned_at else 0,
+            )
+
         parts = bp.split()
         if len(parts) >= 2:
             month_str = parts[0].lower()
@@ -79,10 +95,17 @@ def sort_bills_chronologically(bills: list[Bill], reverse: bool = False) -> list
                 year = int(parts[1])
             except ValueError:
                 year = 0
-            return (year, month, b.scanned_at.timestamp() if b.scanned_at else 0)
-        return (0, 0, b.scanned_at.timestamp() if b.scanned_at else 0)
-    
+            return (
+                year, month,
+                b.scanned_at.timestamp() if b.scanned_at else 0,
+            )
+        return (
+            0, 0,
+            b.scanned_at.timestamp() if b.scanned_at else 0,
+        )
+
     return sorted(bills, key=get_sort_key, reverse=reverse)
+
 
 # Fields tracked in the insights endpoint
 AMOUNT_FIELDS = [
@@ -229,7 +252,10 @@ def get_tips(
                     )
                     for t in cached
                 ]
-                logger.info("Serving cached tips for bill %s.", request.bill_id)
+                logger.info(
+                    "Serving cached tips for bill %s.",
+                    request.bill_id,
+                )
                 return TipsResponse(tips=tip_items)
             except Exception:
                 pass  # corrupt cache — fall through to regenerate
@@ -310,7 +336,7 @@ def list_receipts(
         .filter(Bill.user_id == current_user.id)
         .all()
     )
-    
+
     # Sort descending by billing_period (newest first)
     sorted_bills = sort_bills_chronologically(bills_q, reverse=True)
     bills = sorted_bills[offset:offset + limit]
@@ -394,7 +420,9 @@ def save_receipt(
     bill = Bill(
         user_id=current_user.id,
         scanned_at=datetime.now(timezone.utc),
-        custom_fields_json=json.dumps(custom_fields) if custom_fields else None,
+        custom_fields_json=(
+            json.dumps(custom_fields) if custom_fields else None
+        ),
         **bill_dict,
     )
     db.add(bill)

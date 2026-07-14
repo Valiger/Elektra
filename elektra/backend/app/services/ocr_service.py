@@ -98,7 +98,10 @@ def extract_text(image_bytes: bytes) -> Dict[str, Any]:
             },
             "total_amt_after_due": {
                 "type": "STRING",
-                "description": "Total amount after due date, including penalty or surcharge",
+                "description": (
+                    "Total amount after due date, "
+                    "including penalty or surcharge"
+                ),
             },
             "_confidence": {
                 "type": "OBJECT",
