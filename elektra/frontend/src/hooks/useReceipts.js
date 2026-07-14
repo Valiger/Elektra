@@ -67,7 +67,7 @@ export function useReceipts() {
     try {
       // 1. Persist the bill
       const saved = await api.post('/api/receipts', billData);
-      const billId = saved.data?.id;
+      const billId = saved.data?.public_id || saved.data?.id;
 
       // 2. Get AI tips (non-blocking — no throw if tips fail)
       try {
@@ -117,7 +117,7 @@ export function useReceipts() {
   const deleteReceipt = useCallback(async (id) => {
     try {
       await api.delete(`/api/receipts/${id}`);
-      setReceipts((prev) => prev.filter((r) => r.id !== id));
+      setReceipts((prev) => prev.filter((r) => (r.public_id || r.id) !== id));
     } catch (err) {
       const msg =
         err.response?.data?.detail || err.message || 'Delete failed.';

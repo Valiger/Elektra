@@ -10,6 +10,18 @@ from app.config import settings
 _used_tokens_lock = threading.Lock()
 _used_tokens: set[str] = set()
 
+_token_blocklist_lock = threading.Lock()
+_token_blocklist: set[str] = set()
+
+def block_token(token: str) -> None:
+    with _token_blocklist_lock:
+        _token_blocklist.add(token)
+
+def is_token_blocked(token: str) -> bool:
+    with _token_blocklist_lock:
+        return token in _token_blocklist
+
+
 
 
 def hash_password(password: str) -> str:
@@ -26,47 +38,58 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_token(user_id: int) -> str:
+def create_token(user_id: int, token_version: int = 0) -> str:
     # 15-minute expiry for access token
     expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode = {"sub": str(user_id), "exp": expire, "type": "access"}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+    to_encode = {"sub": str(user_id), "exp": expire, "type": "access", "tv": token_version}
+    key = settings.JWT_PRIVATE_KEY or settings.SECRET_KEY
+    alg = settings.ALGORITHM if settings.JWT_PRIVATE_KEY else "HS256"
+    encoded_jwt = jwt.encode(to_encode, key, algorithm=alg)
     return encoded_jwt
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: int, token_version: int = 0) -> str:
     # 7-day expiry for refresh token
     expire = datetime.now(timezone.utc) + timedelta(days=7)
-    to_encode = {"sub": str(user_id), "exp": expire, "type": "refresh"}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+    to_encode = {"sub": str(user_id), "exp": expire, "type": "refresh", "tv": token_version}
+    key = settings.JWT_PRIVATE_KEY or settings.SECRET_KEY
+    alg = settings.ALGORITHM if settings.JWT_PRIVATE_KEY else "HS256"
+    encoded_jwt = jwt.encode(to_encode, key, algorithm=alg)
     return encoded_jwt
 
 
-def decode_token(token: str) -> Optional[int]:
+
+def decode_token(token: str) -> Optional[tuple[int, int]]:
+    if is_token_blocked(token):
+        return None
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        key = settings.JWT_PUBLIC_KEY or settings.SECRET_KEY
+        alg = settings.ALGORITHM if settings.JWT_PUBLIC_KEY else "HS256"
+        payload = jwt.decode(token, key, algorithms=[alg, "HS256"])
         if payload.get("type") != "access":
-            # legacy tokens won't have "type", so this might reject them,
-            # but we're changing security posture so it's fine.
             if "type" in payload:
                 return None
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             return None
-        return int(user_id_str)
+        return (int(user_id_str), payload.get("tv", 0))
     except (PyJWTError, ValueError):
         return None
 
 
-def decode_refresh_token(token: str) -> Optional[int]:
+def decode_refresh_token(token: str) -> Optional[tuple[int, int]]:
+    if is_token_blocked(token):
+        return None
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        key = settings.JWT_PUBLIC_KEY or settings.SECRET_KEY
+        alg = settings.ALGORITHM if settings.JWT_PUBLIC_KEY else "HS256"
+        payload = jwt.decode(token, key, algorithms=[alg, "HS256"])
         if payload.get("type") != "refresh":
             return None
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             return None
-        return int(user_id_str)
+        return (int(user_id_str), payload.get("tv", 0))
     except (PyJWTError, ValueError):
         return None
 
@@ -79,7 +102,9 @@ def create_reset_token(user_id: int) -> str:
     """Short-lived (15 min) JWT for password reset."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode = {"sub": str(user_id), "exp": expire, "type": "password_reset"}
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+    key = settings.JWT_PRIVATE_KEY or settings.SECRET_KEY
+    alg = settings.ALGORITHM if settings.JWT_PRIVATE_KEY else "HS256"
+    return jwt.encode(to_encode, key, algorithm=alg)
 
 
 def decode_reset_token(token: str) -> Optional[int]:
@@ -88,7 +113,9 @@ def decode_reset_token(token: str) -> Optional[int]:
     Returns the user_id on success, None on failure / wrong type.
     """
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        key = settings.JWT_PUBLIC_KEY or settings.SECRET_KEY
+        alg = settings.ALGORITHM if settings.JWT_PUBLIC_KEY else "HS256"
+        payload = jwt.decode(token, key, algorithms=[alg, "HS256"])
         if payload.get("type") != "password_reset":
             return None
         user_id_str: str = payload.get("sub")

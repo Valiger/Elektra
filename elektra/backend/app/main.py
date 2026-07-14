@@ -15,9 +15,29 @@ from app.limiter import limiter
 from app.db.database import SessionLocal
 from app.services.utility_rates_pipeline import sync_utility_rates
 from apscheduler.schedulers.background import BackgroundScheduler
+import sentry_sdk
+import structlog
+
+# Initialize Sentry
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+
+# Configure Structlog
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),
+    ]
+)
+logger = structlog.get_logger()
+
 
 def scheduled_rates_sync():
-    logger = logging.getLogger(__name__)
     logger.info("Running scheduled utility rates sync...")
     db = SessionLocal()
     try:

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+- **IDOR Prevention:** Replaced sequential integer IDs with UUIDs (`public_id`) in API responses and frontend routing for Users and Bills.
+- **JWT Upgrade:** Migrated from `HS256` symmetric signing to `RS256` asymmetric signing using RSA keypairs.
+- **Session Management:** Added `token_version` tracking and a `/logout` endpoint to properly invalidate old sessions (including after password resets).
+- **Brute Force Protection:** Implemented in-memory lockout for the `/login` endpoint after 5 consecutive failed attempts.
+- **Data Encryption:** Added Fernet encryption for personally identifiable information (PII) at rest (province and cooperative fields).
+- **File Validation:** Integrated `filetype` magic byte checking to strictly enforce upload file types regardless of extension.
+- **Logging & Monitoring:** Configured `structlog` for structured logging and integrated `sentry-sdk` for error tracking.
+
+---
+
 ## [1.0.0] – 2026-06-25
 
 ### Added

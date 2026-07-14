@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean
@@ -11,7 +12,8 @@ class Bill(Base):
     __tablename__ = "bills"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    public_id = Column(String(36), default=lambda: str(uuid.uuid4()), unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     scanned_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )

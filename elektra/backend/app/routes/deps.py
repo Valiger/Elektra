@@ -18,12 +18,30 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    user_id = decode_token(token)
-    if user_id is None:
+    decoded = decode_token(token)
+    if decoded is None:
         raise credentials_exception
+    user_id, token_version = decoded
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+        
+    if user.token_version != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired (password changed or logged out)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return user
+
+def require_role(role: str):
+    def role_dependency(current_user: User = Depends(get_current_user)):
+        if current_user.role != role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions"
+            )
+        return current_user
+    return role_dependency

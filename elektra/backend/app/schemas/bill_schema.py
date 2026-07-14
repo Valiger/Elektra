@@ -4,12 +4,16 @@ bill_schema.py — Pydantic schemas for receipt CRUD and scan responses.
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
 
 
 # ── Scan response ─────────────────────────────────────────────────
 
-class ScanResponse(BaseModel):
+class ScanResponse(BaseSchema):
     """Returned by POST /api/receipts/scan"""
     confidence: float
     data: Dict[str, Any]
@@ -20,7 +24,7 @@ class ScanResponse(BaseModel):
 
 # ── Bill create / save ────────────────────────────────────────────
 
-class BillCreate(BaseModel):
+class BillCreate(BaseSchema):
     billing_period: Optional[str] = None
     du_name: Optional[str] = None
     image_filename: Optional[str] = None
@@ -61,6 +65,7 @@ class BillCreate(BaseModel):
 
 class BillResponse(BillCreate):
     id: int
+    public_id: str
     user_id: int
     scanned_at: Optional[datetime] = None
     tips_json: Optional[str] = None
@@ -69,7 +74,7 @@ class BillResponse(BillCreate):
         from_attributes = True
 
 
-class PaginatedBills(BaseModel):
+class PaginatedBills(BaseSchema):
     items: List[BillResponse]
     total: int
     page: int
@@ -77,14 +82,14 @@ class PaginatedBills(BaseModel):
 
 # ── Tips ──────────────────────────────────────────────────────────
 
-class TipItem(BaseModel):
+class TipItem(BaseSchema):
     title: str
     description: str
     savings_note: Optional[str] = None
 
 
-class TipsRequest(BaseModel):
-    bill_id: Optional[int] = None
+class TipsRequest(BaseSchema):
+    bill_id: Optional[str] = None
     billing_period: Optional[str] = None
     du_name: Optional[str] = None
     kwh_consumed: Optional[float] = None
@@ -100,5 +105,5 @@ class TipsRequest(BaseModel):
     total_amt_after_due: Optional[float] = None
 
 
-class TipsResponse(BaseModel):
+class TipsResponse(BaseSchema):
     tips: List[TipItem]

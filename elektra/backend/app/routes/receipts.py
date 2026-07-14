@@ -18,7 +18,9 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+import filetype
 
 from app.db.database import get_db
 from app.models.bill import Bill
@@ -148,6 +150,13 @@ async def scan_receipt(
         )
 
     contents = await file.read()
+    
+    kind = filetype.guess(contents)
+    if kind is None or kind.mime not in ALLOWED_TYPES:
+        raise HTTPException(
+            400,
+            "Invalid file content. Please upload a valid image or PDF.",
+        )
     if len(contents) > MAX_SIZE:
         raise HTTPException(400, "File too large. Maximum size is 10 MB.")
 
@@ -238,7 +247,7 @@ def get_tips(
     # ── 1. Serve from cache if this specific bill already has tips ──
     if request.bill_id:
         bill = db.query(Bill).filter(
-            Bill.id == request.bill_id,
+            Bill.public_id == request.bill_id,
             Bill.user_id == current_user.id,
         ).first()
         if bill and bill.tips_json:
@@ -305,7 +314,7 @@ def get_tips(
     # ── 4. Cache tips on the bill record ────────────────────────────
     if request.bill_id:
         bill = db.query(Bill).filter(
-            Bill.id == request.bill_id,
+            Bill.public_id == request.bill_id,
             Bill.user_id == current_user.id,
         ).first()
         if bill:
@@ -431,16 +440,42 @@ def save_receipt(
     return BillResponse.model_validate(bill)
 
 
-# ── DELETE /api/receipts/{id} ───────────────────────────────────────
+# ── GET /api/receipts/download/{public_id} ────────────────────────
 
-@router.delete("/{bill_id}", status_code=204)
-def delete_receipt(
-    bill_id: int,
+@router.get("/download/{public_id}")
+def download_receipt(
+    public_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     bill = db.query(Bill).filter(
-        Bill.id == bill_id,
+        Bill.public_id == public_id,
+        Bill.user_id == current_user.id,
+    ).first()
+    if not bill or not bill.image_filename:
+        raise HTTPException(404, "Receipt or image not found.")
+    
+    filepath = os.path.join(UPLOAD_DIR, bill.image_filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(404, "Image file not found on server.")
+        
+    return FileResponse(
+        path=filepath, 
+        filename=bill.image_filename,
+        content_disposition_type="attachment"
+    )
+
+
+# ── DELETE /api/receipts/{public_id} ───────────────────────────────────────
+
+@router.delete("/{public_id}", status_code=204)
+def delete_receipt(
+    public_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    bill = db.query(Bill).filter(
+        Bill.public_id == public_id,
         Bill.user_id == current_user.id,
     ).first()
     if not bill:

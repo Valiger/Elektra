@@ -12,8 +12,13 @@ The project is fully tested, hardened, and prepared for production deployment.
 - **Backend:** FastAPI (Python) connected to a PostgreSQL database via SQLAlchemy and Alembic.
 - **Frontend:** React + Vite + Tailwind CSS.
 - **Mobile App:** React Native + Expo (EAS configured for Play Store and App Store).
-- **Authentication:** JWT-based auth utilising **PyJWT** (migrated from `python-jose` to resolve 3 critical CVEs) and **bcrypt** for secure password hashing.
-- **Security Hardening:** All dependencies strictly audited (0 high/critical vulnerabilities via `npm overrides`), rate limiting enabled, and all live credentials (Gemini API, GCP Service Accounts) successfully rotated and blocked from git history.
+- **Authentication & Sessions:** JWT-based auth utilizing **PyJWT** (migrated from `python-jose` to resolve 3 critical CVEs) and **bcrypt** for secure password hashing. JWTs are signed asymmetrically using **RS256** and tied to a `token_version` in the database to allow for secure, global session invalidation (e.g. on logout or password reset).
+- **Security Hardening:** 
+  - **IDOR Prevention:** All user-facing routes utilize UUIDs (`public_id`) instead of sequential IDs to prevent enumeration.
+  - **Data Privacy:** PII fields (like province and cooperative data) are encrypted at rest using **Fernet** symmetric encryption via a custom SQLAlchemy TypeDecorator.
+  - **API Protections:** Implemented brute-force login lockout, strict file upload validation via magic bytes (`filetype`), and explicit whitespace trimming on all Pydantic schemas.
+  - **Monitoring:** Integrated structured logging via `structlog` and error tracking via `sentry-sdk`.
+  - All dependencies strictly audited, rate limiting enabled, and all live credentials successfully rotated and blocked from git history.
 
 ### Deployment Configuration
 - **Render (Backend):** Configured via `render.yaml` using Render's native Python runtime, automated Alembic DB migrations and seed data on startup, and a `/health` endpoint for continuous uptime monitoring. Playwright (Chromium) is installed at build time for the utility rates scraping pipeline.

@@ -105,7 +105,7 @@ export default function ReceiptsPage() {
   const handleDelete = async (id) => {
     await deleteReceipt(id);
     // If the deleted receipt was displayed in CurrentInsights, clear it
-    if (currentReceipt?.id === id) {
+    if ((currentReceipt?.public_id || currentReceipt?.id) === id) {
       setCurrentReceipt(null);
     }
     // Refresh list
@@ -192,7 +192,7 @@ export default function ReceiptsPage() {
         {/* ── 5. Upload History ── */}
         <UploadHistory
           receipts={receipts}
-          activeReceiptId={currentReceipt?.id ?? null}
+          activeReceiptId={currentReceipt?.public_id || currentReceipt?.id || null}
           onSelect={handleSelectHistory}
           onDelete={handleDelete}
           loading={historyLoading}

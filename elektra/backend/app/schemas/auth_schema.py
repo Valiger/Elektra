@@ -1,8 +1,10 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
 
-class SignupRequest(BaseModel):
+class SignupRequest(BaseSchema):
     email: str
     username: str
     password: str
@@ -16,12 +18,12 @@ class SignupRequest(BaseModel):
     marketing_consent: Optional[bool] = False
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(BaseSchema):
     email: str
     password: str
 
 
-class UserOut(BaseModel):
+class UserOut(BaseSchema):
     id: int
     email: str
     username: str
@@ -36,17 +38,17 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
-class AuthResponse(BaseModel):
+class AuthResponse(BaseSchema):
     access_token: str
     refresh_token: str
     user: UserOut
 
 
-class RefreshTokenRequest(BaseModel):
+class RefreshTokenRequest(BaseSchema):
     refresh_token: str
 
 
-class ProfileUpdateRequest(BaseModel):
+class ProfileUpdateRequest(BaseSchema):
     username: Optional[str] = None
     establishment_type: Optional[str] = None
     location_type: Optional[str] = None
@@ -59,11 +61,11 @@ class ProfileUpdateRequest(BaseModel):
     confirm_new_password: Optional[str] = None
 
 
-class ForgotPasswordRequest(BaseModel):
+class ForgotPasswordRequest(BaseSchema):
     email: str
 
 
-class ResetPasswordRequest(BaseModel):
+class ResetPasswordRequest(BaseSchema):
     token: str
     new_password: str
     confirm_new_password: str

@@ -75,10 +75,11 @@ function ConfirmDialog({ receipt, onConfirm, onCancel, deleting }) {
 // ── Receipt row ───────────────────────────────────────────────────────────────
 function ReceiptRow({ receipt, onTap, onDeleteRequest, active }) {
   const kwh = fmt(receipt.kwh_consumed);
+  const rid = receipt.public_id || receipt.id;
 
   return (
     <div
-      id={`receipt-row-${receipt.id}`}
+      id={`receipt-row-${rid}`}
       className="group flex items-center gap-3 rounded-2xl px-4 py-3.5 cursor-pointer transition-all duration-200 relative"
       style={{
         background: active
@@ -141,7 +142,7 @@ function ReceiptRow({ receipt, onTap, onDeleteRequest, active }) {
 
         {/* Delete btn */}
         <button
-          id={`delete-receipt-${receipt.id}`}
+          id={`delete-receipt-${rid}`}
           onClick={(e) => {
             e.stopPropagation();
             onDeleteRequest(receipt);
@@ -182,7 +183,7 @@ export default function UploadHistory({
   const sorted = [...receipts].sort((a, b) => {
     const ta = a.scanned_at || '';
     const tb = b.scanned_at || '';
-    return tb.localeCompare(ta) || b.id - a.id;
+    return tb.localeCompare(ta) || (b.id || 0) - (a.id || 0);
   });
 
   const [page, setPage]           = useState(1);
@@ -208,7 +209,7 @@ export default function UploadHistory({
     setDeleting(true);
     setDeleteError(null);
     try {
-      await onDelete(confirmTarget.id);
+      await onDelete(confirmTarget.public_id || confirmTarget.id);
       setConfirm(null);
     } catch (err) {
       setDeleteError(err.message || 'Delete failed. Please try again.');
@@ -287,15 +288,18 @@ export default function UploadHistory({
         {/* List */}
         {!fetchError && visible.length > 0 && (
           <div className="flex flex-col gap-2">
-            {visible.map((r) => (
+            {visible.map((r) => {
+              const rid = r.public_id || r.id;
+              return (
               <ReceiptRow
-                key={r.id}
+                key={rid}
                 receipt={r}
-                active={r.id === activeReceiptId}
+                active={rid === activeReceiptId}
                 onTap={onSelect}
                 onDeleteRequest={handleDeleteRequest}
               />
-            ))}
+              );
+            })}
           </div>
         )}
 
