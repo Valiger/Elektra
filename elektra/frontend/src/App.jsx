@@ -10,6 +10,7 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import CookiePolicyPage from './pages/CookiePolicyPage';
 import AccessibilityPage from './pages/AccessibilityPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import BottomNav from './components/BottomNav';
 import CookieConsentBanner from './components/CookieConsentBanner';
 const ProtectedLayout = () => {
@@ -53,6 +54,7 @@ function App() {
         <Route path="/terms" element={<TermsOfServicePage />} />
         <Route path="/cookie-policy" element={<CookiePolicyPage />} />
         <Route path="/accessibility" element={<AccessibilityPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
       {/* Protected Routes */}
       <Route element={<ProtectedLayout />}>

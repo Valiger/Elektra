@@ -57,3 +57,13 @@ class ProfileUpdateRequest(BaseModel):
     current_password: Optional[str] = None
     new_password: Optional[str] = None
     confirm_new_password: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+    confirm_new_password: str

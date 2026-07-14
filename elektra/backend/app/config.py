@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     FRONTEND_URL: str = "http://localhost:5173"
     ALLOWED_ORIGINS: str = ""
+    RESEND_API_KEY: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
