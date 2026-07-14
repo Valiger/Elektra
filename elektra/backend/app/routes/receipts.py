@@ -212,18 +212,54 @@ def get_tips(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Count how many bills from today have tips generated
+    # ── 1. Serve from cache if this specific bill already has tips ──
+    if request.bill_id:
+        bill = db.query(Bill).filter(
+            Bill.id == request.bill_id,
+            Bill.user_id == current_user.id,
+        ).first()
+        if bill and bill.tips_json:
+            try:
+                cached = json.loads(bill.tips_json)
+                tip_items = [
+                    TipItem(
+                        title=t.get("title", "Energy Tip"),
+                        description=t.get("description", ""),
+                        savings_note=t.get("savings_note"),
+                    )
+                    for t in cached
+                ]
+                logger.info("Serving cached tips for bill %s.", request.bill_id)
+                return TipsResponse(tips=tip_items)
+            except Exception:
+                pass  # corrupt cache — fall through to regenerate
+
+    # ── 2. Enforce 1 AI tips call per user per day ──────────────────
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     tips_generated_today = db.query(Bill).filter(
         Bill.user_id == current_user.id,
         Bill.scanned_at >= today_start,
-        Bill.tips_json.is_not(None)
+        Bill.tips_json.is_not(None),
     ).count()
 
     if tips_generated_today >= 1:
-        return TipsResponse(tips=[])
+        # Daily limit hit — return rule-based tips instead of empty
+        bill_data = request.model_dump(exclude={"bill_id"})
+        kwh = bill_data.get("kwh_consumed")
+        amount = bill_data.get("amount_due")
+        from app.services.tips_service import _rule_based_tips
+        return TipsResponse(tips=[
+            TipItem(
+                title=t.get("title", "Energy Tip"),
+                description=t.get("description", ""),
+                savings_note=t.get("savings_note"),
+            )
+            for t in _rule_based_tips(kwh, amount)
+        ])
 
+    # ── 3. Generate fresh tips via Gemini ───────────────────────────
     bill_data = request.model_dump(exclude={"bill_id"})
     raw_tips = generate_tips(bill_data)
 
@@ -240,7 +276,7 @@ def get_tips(
                 )
             )
 
-    # Optionally attach tips to an existing bill record
+    # ── 4. Cache tips on the bill record ────────────────────────────
     if request.bill_id:
         bill = db.query(Bill).filter(
             Bill.id == request.bill_id,
@@ -252,7 +288,6 @@ def get_tips(
             )  # type: ignore
             db.commit()
 
-    # Update last tip date
     current_user.last_tip_date = today_start.date()
     db.commit()
 

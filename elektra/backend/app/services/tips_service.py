@@ -104,14 +104,14 @@ def _gemini_tips(bill_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     )
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(prompt)
     except Exception as e:
         logger.warning(
-            f"gemini-2.5-flash failed: {e}. "
-            f"Trying gemini-1.0-pro."
+            f"gemini-2.0-flash failed: {e}. "
+            f"Trying gemini-1.5-flash."
         )
-        model = genai.GenerativeModel("gemini-1.0-pro")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(prompt)
 
     raw = response.text.strip()

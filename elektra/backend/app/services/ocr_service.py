@@ -4,10 +4,12 @@ Extracts structured bill data directly from an image.
 """
 
 import os
+import io
 import json
 import logging
 from typing import Dict, Any
 
+from PIL import Image
 from google import genai
 from google.genai import types
 
@@ -27,10 +29,36 @@ def _get_genai_client():
     return _genai_client
 
 
+def _compress_image(image_bytes: bytes, max_width: int = 1024) -> bytes:
+    """Resize and re-encode image as JPEG to reduce token usage."""
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_size = (max_width, int(img.height * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        if img.mode in ("RGBA", "P", "LA"):
+            img = img.convert("RGB")
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=85)
+        compressed = out.getvalue()
+        logger.debug(
+            "Image compressed: %d bytes -> %d bytes",
+            len(image_bytes),
+            len(compressed),
+        )
+        return compressed
+    except Exception as e:
+        logger.warning("Image compression failed (%s), using original.", e)
+        return image_bytes
+
+
 def extract_text(image_bytes: bytes) -> Dict[str, Any]:
     """
     Attempt Gemini extraction to output strict JSON structured data.
+    Image is compressed before sending to reduce API token usage.
     """
+    image_bytes = _compress_image(image_bytes)
     client = _get_genai_client()
 
     # We define the JSON schema we want Gemini to return
@@ -109,7 +137,7 @@ def extract_text(image_bytes: bytes) -> Dict[str, Any]:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             contents=[
                 types.Part.from_bytes(
                     data=image_bytes, mime_type="image/jpeg"
