@@ -16,7 +16,7 @@ The project is fully tested, hardened, and prepared for production deployment.
 - **Security Hardening:** All dependencies strictly audited (0 high/critical vulnerabilities via `npm overrides`), rate limiting enabled, and all live credentials (Gemini API, GCP Service Accounts) successfully rotated and blocked from git history.
 
 ### Deployment Configuration
-- **Railway (Backend):** Configured via `railway.json` using Nixpacks, automated Alembic DB migrations on startup, and a `/health` endpoint for continuous uptime monitoring.
+- **Render (Backend):** Configured via `render.yaml` using Render's native Python runtime, automated Alembic DB migrations and seed data on startup, and a `/health` endpoint for continuous uptime monitoring. Playwright (Chromium) is installed at build time for the utility rates scraping pipeline.
 - **Vercel (Frontend):** Configured via `vercel.json` with SPA routing rewrites, aggressive asset caching, and strict HTTP security headers. Production builds are optimized in `vite.config.js`.
 - **Expo EAS (Mobile):** Configured via `eas.json` and `app.json` with proper bundle identifiers (`com.valiger.elektra`) for both Apple App Store and Google Play Store submission.
 
@@ -24,59 +24,48 @@ The project is fully tested, hardened, and prepared for production deployment.
 
 ## Stage 1 — OCR (`ocr_service.py`)
 
-The core intelligence of the Elektra backend is a **two-stage pipeline**: first it reads text off an image using OCR, then it extracts structured financial fields from that text using regex.
+The core intelligence of the Elektra backend is a **single-stage LLM pipeline**: it sends a compressed image directly to the Gemini API and receives structured JSON output — no intermediate text extraction or regex required.
 
-The goal here is simple: turn a photo of an electric bill into a string of text. The service uses a **hybrid engine** with smart fallback logic.
+The goal is simple: turn a photo of an electric bill directly into structured data. The service uses **Google Gemini** (`gemini-2.0-flash`) with a defined JSON schema.
 
 ```
 Image Bytes
     │
     ▼
-Is google-cloud-vision installed?  ──No──► Error
-    │ Yes
-    ▼
-Is GOOGLE_APPLICATION_CREDENTIALS set?  ──No──► Error
-    │ Yes
-    ▼
-Daily quota ≤ 3 scans?  ──No──► Max Limit Reached
-    │ Yes
-    ▼
-Call Google Cloud Vision API
+Compress image (Pillow: resize to ≤1024px wide, JPEG 85%)  ← reduces token cost
     │
-    ├── Success ──► return text + confidence
-    └── Any error ──► rollback counter 
+    ▼
+Is GEMINI_API_KEY set?  ──No──► Error
+    │ Yes
+    ▼
+Daily quota ≤ 3 scans (per user, rolling 24h)?  ──No──► 429 Too Many Requests
+    │ Yes
+    ▼
+Call Gemini API (gemini-2.0-flash) with image + JSON schema
+    │
+    ├── Success ──► return structured JSON + per-field confidence scores
+    └── Any error ──► raise HTTPException(500)
 ```
 
-### Primary Engine: Google Cloud Vision
+### Primary Engine: Google Gemini (`gemini-2.0-flash`)
 
 ```python
-response = client.document_text_detection(image=image)
-text = response.full_text_annotation.text
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents=[image_part, prompt],
+    config=GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=schema,
+        temperature=0.0,
+    ),
+)
 ```
 
-- Uses the `document_text_detection` method (designed for dense, structured text like bills/forms — better than plain `text_detection`).
-- Extracts **full page confidence** by averaging over all pages in the annotation.
-- Returns the raw text uppercased for case-insensitive downstream processing.
-- **Daily rate limiter**: capped at **10 scans/day** (in-memory counter reset at midnight) to protect API credits.
-
-### Fallback Engine: EasyOCR (local, offline)
-
-```python
-reader = easyocr.Reader(["en"], gpu=False)
-results = reader.readtext(tmp_path, detail=1)
-```
-
-Before EasyOCR runs, the image is preprocessed by `preprocess()`:
-
-| Step | What it does |
-|---|---|
-| Grayscale (`convert("L")`) | Removes color noise |
-| Contrast ×2.0 | Makes print sharper |
-| Sharpen filter | Improves edge clarity |
-| Resize to max 1600px | Prevents memory issues |
-| Save as temp PNG | EasyOCR needs a file path, not bytes |
-
-EasyOCR returns individual text bounding boxes + per-box confidence. The service joins all boxes into a single space-separated string and computes the average confidence.
+- Uses **structured JSON output** via `response_schema` — Gemini returns valid JSON directly, no regex parsing of raw text needed.
+- `temperature=0.0` ensures deterministic, consistent extractions.
+- Returns **per-field confidence scores** (0.0–1.0) so the frontend can flag uncertain fields for manual review.
+- **Image compression** (via Pillow) resizes large phone photos to ≤1024px wide and re-encodes to JPEG at 85% quality before sending, significantly reducing token usage and API cost.
+- **Daily rate limiter**: capped at **3 scans per user per 24 hours** (tracked in the `scan_usage` DB table) to protect API quota.
 
 ---
 
@@ -144,23 +133,42 @@ User uploads image
   Validate file type & size (≤10MB, JPG/PNG/WebP/PDF)
         │
         ▼
-  extract_text(image_bytes)          ← ocr_service.py
-  └─► Google Vision  OR  EasyOCR
-        │
-        ▼ { text: "...", confidence: 0.97 }
+  Compress image (Pillow: ≤1024px, JPEG 85%)  ← token cost reduction
         │
         ▼
-  parse_bill(text)                   ← bill_parser.py
-  └─► regex extraction of 11+ fields
+  extract_text(image_bytes)          ← ocr_service.py
+  └─► Gemini 2.0 Flash (structured JSON schema)
         │
-        ▼ { gen_charge: 890.10, kwh_consumed: 245, ... _confidence: {...} }
+        ▼ { parsed: { gen_charge, kwh_consumed, ... }, _confidence: {...} }
         │
         ▼
   Save image file to disk (UUID filename)
         │
         ▼
   Return ScanResponse to frontend:
-    { confidence, data, needs_review, image_filename }
+    { confidence, data, needs_review, image_filename, scans_remaining }
+```
+
+### AI Tips Pipeline (API Route: `POST /api/receipts/tips`)
+
+```
+Frontend sends bill_id + bill fields
+        │
+        ▼
+  bill.tips_json already set?  ──Yes──► Return cached tips (0 API calls)
+        │ No
+        ▼
+  User already got AI tips today?  ──Yes──► Return rule-based tips
+        │ No
+        ▼
+  generate_tips(bill_data)           ← tips_service.py
+  └─► Gemini 2.0 Flash (Philippine energy consultant prompt)
+        │
+        ▼
+  Save tips_json to bill DB record
+        │
+        ▼
+  Return TipsResponse: [ { title, description, savings_note } × 3 ]
 ```
 
 ---
@@ -169,12 +177,14 @@ User uploads image
 
 | Decision | Reason |
 |---|---|
-| **Google Vision first, EasyOCR fallback** | Cloud Vision handles messy/tilted photos far better; EasyOCR works fully offline for cost-free usage |
-| **10 scan/day rate cap** | Google Vision free tier is limited; prevents accidental billing |
-| **Uppercase everything** | Makes all regex patterns case-insensitive without the `re.IGNORECASE` overhead on every pattern |
-| **Window-based extraction** | Philippine bill formats vary wildly by DU; this approach avoids needing a perfect table parser |
+| **Gemini 2.0 Flash for OCR** | Single API call returns structured JSON directly — no separate regex bill parser needed; handles varied DU formats robustly |
+| **Image compression before API call** | Pillow resizes to ≤1024px and re-encodes to JPEG 85% before sending — drastically reduces token usage for large phone photos |
+| **3 scan/day rate cap (per user, DB-tracked)** | AI Studio free tier is generous but finite; per-user DB tracking is more robust than in-memory counters that reset on redeploy |
+| **Tips cached in `tips_json` column** | Re-opening a receipt never triggers a Gemini call again; the stored tips are served from the DB instantly |
+| **1 AI tips generation per user per day** | Prevents heavy users from exhausting the daily free quota; falls back to high-quality rule-based tips on subsequent calls |
+| **Window-based field extraction (legacy)** | Original regex parser approach for reference; replaced by Gemini's schema-enforced JSON output |
 | **VAT fields always summed** | Pre-printed totals on bills can differ due to rounding; summing the components is more reliable |
-| **Never raises on bad input** | The outer `try/except` in `parse_bill` ensures a broken bill image never crashes the API |
+| **Never raises on bad input** | The outer `try/except` ensures a broken bill image never crashes the API — falls back gracefully |
 | **JWT over python-jose** | `python-jose` was abandoned with 3 active CVEs; replaced with `PyJWT` for enterprise-grade security |
 
 ---
