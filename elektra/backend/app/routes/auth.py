@@ -37,16 +37,15 @@ from datetime import datetime, timedelta
 _failed_logins: dict[str, list[datetime]] = {}
 
 def check_password_complexity(password: str) -> None:
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
-    if not re.search(r"[A-Z]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
-    if not re.search(r"[a-z]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
-    if not re.search(r"[0-9]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one number")
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+    if (len(password) < 8 or 
+        not re.search(r"[A-Z]", password) or 
+        not re.search(r"[a-z]", password) or 
+        not re.search(r"[0-9]", password) or 
+        not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password)):
+        raise HTTPException(
+            status_code=400, 
+            detail="Password must contain: at least 8 characters, one uppercase letter (A-Z), one lowercase letter (a-z), one number (0-9), and one special character (like ! @ # $ % ^ & *)."
+        )
 
 router = APIRouter()
 

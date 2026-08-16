@@ -77,6 +77,16 @@ export default function SignupForm() {
 
   const [formError, setFormError] = useState(null);
 
+  const isPasswordValid = (pw) => {
+    return (
+      pw.length >= 8 &&
+      /[A-Z]/.test(pw) &&
+      /[a-z]/.test(pw) &&
+      /[0-9]/.test(pw) &&
+      /[!@#$%^&*(),.?":{}|<>]/.test(pw)
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
@@ -85,8 +95,8 @@ export default function SignupForm() {
       setFormError("Passwords do not match");
       return;
     }
-    if (password.length < 8) {
-      setFormError("Password must be at least 8 characters");
+    if (!isPasswordValid(password)) {
+      setFormError("Password must contain: at least 8 characters, one uppercase letter (A-Z), one lowercase letter (a-z), one number (0-9), and one special character (like ! @ # $ % ^ & *).");
       return;
     }
     
@@ -157,14 +167,21 @@ export default function SignupForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="block text-sm font-bold text-on-tertiary-fixed ml-1 uppercase tracking-wider">Password</label>
-          <input 
-            className="w-full bg-[rgba(200,170,240,0.20)] border-none rounded-lg py-4 px-5 text-on-surface placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary transition-all duration-300 outline-none" 
-            placeholder="••••••••" 
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative">
+            <input 
+              className="w-full bg-[rgba(200,170,240,0.20)] border-none rounded-lg py-4 px-5 pr-12 text-on-surface placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary transition-all duration-300 outline-none" 
+              placeholder="••••••••" 
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+            {isPasswordValid(password) && (
+              <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[#4CAF50] font-bold">
+                check_circle
+              </span>
+            )}
+          </div>
         </div>
         <div className="space-y-2">
           <label className="block text-sm font-bold text-on-tertiary-fixed ml-1 uppercase tracking-wider">Confirm Password</label>
